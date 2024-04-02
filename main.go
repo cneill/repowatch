@@ -1,0 +1,159 @@
+package main
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"slices"
+
+	"github.com/fatih/color"
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
+)
+
+const (
+	identChars      = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	identColorChars = "bcgmry"
+)
+
+type identifier struct {
+	chars     string
+	color     *color.Color
+	identStr  string
+	signature object.Signature
+}
+
+func (i identifier) String() string {
+	return i.color.Sprint(i.chars)
+}
+
+var identColors = map[byte]*color.Color{
+	'b': color.New(color.FgHiBlue),
+	'c': color.New(color.FgHiCyan),
+	'g': color.New(color.FgHiGreen),
+	'm': color.New(color.FgMagenta),
+	'r': color.New(color.FgRed),
+	// 'w': color.New(color.FgWhite),
+	'y': color.New(color.FgHiYellow),
+}
+
+// hash :: identifier - this makes sure we grab the same identifier for the same hash every time
+var (
+	seenHashes = map[string]identifier{} //nolint:gochecknoglobals
+	identMap   = map[string]identifier{} //nolint:gochecknoglobals
+)
+
+func nextIdent() identifier {
+	char1 := string(identChars[len(identMap)/len(identChars)])
+	char2 := string(identChars[len(identMap)%len(identChars)])
+	colorChar := identColorChars[len(identMap)%len(identColorChars)]
+	identStr := char1 + char2 + string(colorChar)
+
+	id := identifier{
+		chars:    char1 + char2,
+		color:    identColors[colorChar],
+		identStr: identStr,
+	}
+
+	identMap[identStr] = id
+
+	return id
+}
+
+func getCommitterIdent(author object.Signature) (identifier, error) {
+	// can re-use characters between name and email
+
+	sha := sha256.New()
+	_, err := sha.Write([]byte(author.Name + author.Email))
+	if err != nil {
+		return identifier{}, fmt.Errorf("failed to get author name+email hash (name=%q, email=%q): %w", author.Name, author.Email, err)
+	}
+	hash := sha.Sum(nil)
+	hashStr := hex.EncodeToString(hash)
+
+	if ident, ok := seenHashes[hashStr]; ok {
+		return ident, nil
+	}
+
+	ident := nextIdent()
+	ident.signature = author
+
+	seenHashes[hashStr] = ident
+
+	return ident, nil
+}
+
+func getCommitterMap(commits []*object.Commit) error {
+	for _, commit := range commits {
+		ident, err := getCommitterIdent(commit.Author)
+		// ident, err := getCommitterIdent(commit.Committer)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("%s ", ident)
+	}
+
+	return nil
+}
+
+func walkRepo(path string) error {
+	repo, err := git.PlainOpen(path)
+	if err != nil {
+		return fmt.Errorf("failed to open repo: %w", err)
+	}
+
+	log, err := repo.Log(&git.LogOptions{
+		Order: git.LogOrderCommitterTime,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get git log: %w", err)
+	}
+
+	defer log.Close()
+
+	commits := make([]*object.Commit, 0, 1000)
+
+	for i := 0; ; i++ {
+		commit, err := log.Next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
+			fmt.Printf("error with commit %d: %v\n", i, err)
+
+			continue
+		}
+
+		commits = append(commits, commit)
+	}
+
+	// Get commits from first to last
+	slices.Reverse(commits)
+
+	if err := getCommitterMap(commits); err != nil {
+		return fmt.Errorf("failed to map unique committer :: identifier: %w", err)
+	}
+
+	for hash, ident := range seenHashes {
+		fmt.Printf("%s (%s): %s\n", hash, ident.signature.Name, ident.String())
+	}
+
+	return nil
+}
+
+func main() {
+	if len(os.Args) < 2 {
+		panic(fmt.Errorf("must supply a path to a repo"))
+	}
+
+	path := os.Args[1]
+
+	if err := walkRepo(path); err != nil {
+		panic(fmt.Errorf("failed to walk %q: %w", path, err))
+	}
+}
