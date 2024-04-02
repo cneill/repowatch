@@ -6,6 +6,10 @@ repository.
 
 You can also use the `-committer` flag to see who _committed_ the change.
 
+## Example
+
+![Example of repowatch output](./example.png)
+
 ## Usage
 
 ```
