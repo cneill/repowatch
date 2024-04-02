@@ -143,6 +143,12 @@ func walkRepo(path string) error {
 		return fmt.Errorf("failed to map unique committer :: identifier: %w", err)
 	}
 
+	if graphCommitter {
+		fmt.Println("\n\nGit committers:")
+	} else {
+		fmt.Println("\n\nGit authors:")
+	}
+
 	for _, ident := range identMap {
 		fmt.Printf("%s: %s (%s)\n", ident.String(), ident.signature.Name, ident.signature.Email)
 	}
