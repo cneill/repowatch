@@ -8,7 +8,9 @@ You can also use the `-committer` flag to see who _committed_ the change.
 
 ## Example
 
-![Example of repowatch output](./example.png)
+The infamous `xz` repo with the `-committer` flag set.
+
+![Example of repowatch output in the xz repo](./example.png)
 
 ## Usage
 
