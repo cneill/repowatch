@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"sort"
 
 	"github.com/fatih/color"
 	"github.com/go-git/go-git/v5"
@@ -15,8 +16,7 @@ import (
 )
 
 const (
-	identChars      = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	identColorChars = "bcgmry"
+	identChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 )
 
 type identifier struct {
@@ -32,45 +32,49 @@ func (i identifier) String() string {
 
 // hash :: identifier - this makes sure we grab the same identifier for the same hash every time
 var (
-	seenHashes  = map[string]identifier{} //nolint:gochecknoglobals
-	identMap    = map[string]identifier{} //nolint:gochecknoglobals
-	identColors = map[byte]*color.Color{  //nolint:gochecknoglobals
-		'b': color.New(color.FgHiBlue),
-		'c': color.New(color.FgHiCyan),
-		'g': color.New(color.FgHiGreen),
-		'm': color.New(color.FgMagenta),
-		'r': color.New(color.FgRed),
-		'y': color.New(color.FgHiYellow),
+	seenHashes = map[string]identifier{} //nolint:gochecknoglobals
+	// identMap    = map[string]identifier{} //nolint:gochecknoglobals
+	identifiers = []identifier{}
+	identColors = []*color.Color{ //nolint:gochecknoglobals
+		color.New(color.FgHiBlue),
+		color.New(color.FgHiCyan),
+		color.New(color.FgHiGreen),
+		color.New(color.FgMagenta),
+		color.New(color.FgRed),
+		color.New(color.FgHiYellow),
+		color.New(color.FgWhite, color.BgBlue),
+		color.New(color.FgWhite, color.BgRed),
+		color.New(color.FgBlack, color.BgHiGreen),
+		color.New(color.FgWhite, color.BgGreen),
+		color.New(color.FgBlack, color.BgHiYellow),
 	}
 	graphCommitter bool
 )
 
 func nextIdent(person object.Signature) identifier {
-	char1 := string(identChars[len(identMap)/len(identChars)])
-	char2 := string(identChars[len(identMap)%len(identChars)])
-	colorChar := identColorChars[len(identMap)%len(identColorChars)]
-	identStr := char1 + char2 + string(colorChar)
+	char1 := string(identChars[len(identifiers)/len(identChars)])
+	char2 := string(identChars[len(identifiers)%len(identChars)])
+	identColor := identColors[len(identifiers)%len(identColors)]
+	identStr := char1 + char2
 
-	id := identifier{
+	ident := identifier{
 		chars:     char1 + char2,
-		color:     identColors[colorChar],
+		color:     identColor,
 		identStr:  identStr,
 		signature: person,
 	}
 
-	identMap[identStr] = id
+	identifiers = append(identifiers, ident)
 
-	return id
+	return ident
 }
 
 func getCommitterIdent(person object.Signature) (identifier, error) {
-	// can re-use characters between name and email
-
 	sha := sha256.New()
-	_, err := sha.Write([]byte(person.Name + person.Email))
-	if err != nil {
+	if _, err := sha.Write([]byte(person.Name + person.Email)); err != nil {
 		return identifier{}, fmt.Errorf("failed to get author name+email hash (name=%q, email=%q): %w", person.Name, person.Email, err)
 	}
+
 	hash := sha.Sum(nil)
 	hashStr := hex.EncodeToString(hash)
 
@@ -149,7 +153,11 @@ func walkRepo(path string) error {
 		fmt.Println("\n\nGit authors:")
 	}
 
-	for _, ident := range identMap {
+	sort.Slice(identifiers, func(i, j int) bool {
+		return identifiers[i].identStr < identifiers[j].identStr
+	})
+
+	for _, ident := range identifiers {
 		fmt.Printf("%s: %s (%s)\n", ident.String(), ident.signature.Name, ident.signature.Email)
 	}
 
