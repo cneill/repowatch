@@ -30,25 +30,23 @@ func (i identifier) String() string {
 	return i.color.Sprint(i.chars)
 }
 
-// hash :: identifier - this makes sure we grab the same identifier for the same hash every time
 var (
-	seenHashes = map[string]identifier{} //nolint:gochecknoglobals
-	// identMap    = map[string]identifier{} //nolint:gochecknoglobals
-	identifiers = []identifier{}
-	identColors = []*color.Color{ //nolint:gochecknoglobals
-		color.New(color.FgHiBlue),
-		color.New(color.FgHiCyan),
-		color.New(color.FgHiGreen),
-		color.New(color.FgMagenta),
-		color.New(color.FgRed),
-		color.New(color.FgHiYellow),
-		color.New(color.FgWhite, color.BgBlue),
-		color.New(color.FgWhite, color.BgRed),
-		color.New(color.FgBlack, color.BgHiGreen),
-		color.New(color.FgWhite, color.BgGreen),
-		color.New(color.FgBlack, color.BgHiYellow),
+	seenHashes  = map[string]identifier{} //nolint:gochecknoglobals
+	identifiers = []identifier{}          //noling:gochecknoglobals
+	identColors = []*color.Color{         //nolint:gochecknoglobals
+		color.New(color.FgHiBlue, color.Bold),
+		color.New(color.FgHiCyan, color.Bold),
+		color.New(color.FgHiGreen, color.Bold),
+		color.New(color.FgMagenta, color.Bold),
+		color.New(color.FgRed, color.Bold),
+		color.New(color.FgHiYellow, color.Bold),
+		color.New(color.FgWhite, color.BgBlue, color.Bold),
+		color.New(color.FgBlack, color.BgRed, color.Bold),
+		color.New(color.FgBlack, color.BgHiGreen, color.Bold),
+		color.New(color.FgWhite, color.BgGreen, color.Bold),
+		color.New(color.FgBlack, color.BgHiYellow, color.Bold),
 	}
-	graphCommitter bool
+	graphCommitter bool //nolint:gochecknoglobals
 )
 
 func nextIdent(person object.Signature) identifier {
